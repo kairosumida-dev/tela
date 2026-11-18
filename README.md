@@ -11,14 +11,14 @@ python3 -m http.server 8176 --bind 127.0.0.1
 ```
 
 ```sh
-npx wrangler dev --config signaling/wrangler.toml --port 18787 --ip 127.0.0.1
+npx wrangler dev --config signaling/wrangler.toml --port 18787 --ip 127.0.0.1 --var ALLOWED_ORIGIN:http://127.0.0.1:8176
 ```
 
 Abra [a página local](http://127.0.0.1:8176/) em um navegador de computador. Clique em **Compartilhar tela**, confirme a fonte no navegador e abra o convite em outra aba. Para testar entre computadores, publique a página em HTTPS e use o endereço público da etapa seguinte.
 
 ## GitHub Pages
 
-Publique a raiz do repositório no GitHub Pages com HTTPS ativo. Com a opção padrão em `config.js`, a própria página prepara a conexão manualmente.
+O [site publicado](https://kairosumida-dev.github.io/tela/) gera um link curto que já conecta quem vai assistir. Se o serviço de conexão estiver indisponível, quem apresenta recebe um novo convite com código de resposta. Também dá para selecionar **Usar código manual** antes de começar.
 
 1. Quem apresenta autoriza uma fonte e envia o link de convite.
 2. Quem assiste abre o link, copia o código de resposta e o devolve a quem apresenta.
@@ -28,7 +28,7 @@ O convite e a resposta são compactados para envio em chats. Se algum deles ultr
 
 Abra a página local com `#manual` no fim do endereço para testar esse mesmo fluxo.
 
-## Convite automático com Cloudflare (opcional)
+## Publicação do convite automático
 
 1. Em `signaling/wrangler.toml`, troque `ALLOWED_ORIGIN` pela origem pública do GitHub Pages, por exemplo `https://seu-usuario.github.io`. Use a origem sem o nome do repositório e sem barra final.
 2. Com o Wrangler conectado à sua conta Cloudflare, execute `npx wrangler deploy --config signaling/wrangler.toml`. O arquivo já declara a sala com armazenamento SQLite, compatível com o plano gratuito de Workers.

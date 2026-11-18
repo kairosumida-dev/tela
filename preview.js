@@ -6,6 +6,8 @@ const video = element("video");
 const invite = element("invite-preview");
 const copy = element("copy");
 const stopText = element("stop-text");
+const manualOption = element("manual-option");
+const manualMode = element("manual-mode");
 const roomPattern = /^[a-f0-9]{64}$/;
 const route = new URLSearchParams(location.hash.slice(1));
 const viewerRoom = route.get("assistir");
@@ -55,6 +57,7 @@ function finish(current, message = "", status = "Encerrado") {
   showVideo(null);
   start.hidden = false;
   start.disabled = false;
+  manualOption.hidden = watching || useManual;
   stop.hidden = true;
   invite.value = "";
   invite.disabled = true;
@@ -144,7 +147,7 @@ function failPeer(current, peer) {
 }
 
 async function receive(current, message) {
-  if (session !== current) return;
+  if (session !== current || current.manual) return;
   if (message.type === "ready") {
     clearTimeout(current.signalingTimeout);
     if (current.role === "host") {
@@ -154,6 +157,7 @@ async function receive(current, message) {
       invite.disabled = false;
       copy.disabled = false;
       setStatus("Aguardando espectador");
+      feedback("Envie o convite. A transmissão começa quando a outra pessoa entrar.");
     }
     return;
   }
@@ -222,7 +226,28 @@ function connect(current) {
   const protocols = current.secret ? ["screen-share", current.secret] : ["screen-share"];
   const socket = new WebSocket(endpoint, protocols);
   current.socket = socket;
-  const lost = () => finish(current, "A conexão com a sala caiu. Tente novamente.", "Sala desconectada");
+  const lost = async () => {
+    if (session !== current || current.manual) return;
+    if (current.role === "viewer") {
+      finish(current, "A sala automática está indisponível. Tente novamente ou peça um convite no modo manual.", "Sala desconectada");
+      return;
+    }
+
+    current.manual = true;
+    clearTimeout(current.signalingTimeout);
+    current.socket = null;
+    socket.close();
+    invite.value = "";
+    invite.disabled = true;
+    copy.disabled = true;
+    setStatus("Preparando modo manual");
+    feedback("A sala automática ficou indisponível. Gerando um convite com código de resposta.");
+    try {
+      await manualOffer(current);
+    } catch {
+      finish(current, "Não foi possível gerar o convite manual. Tente novamente.");
+    }
+  };
   current.signalingTimeout = setTimeout(lost, 10_000);
   socket.addEventListener("error", lost);
   socket.addEventListener("close", () => current.queue.finally(lost));
@@ -262,7 +287,8 @@ async function capture() {
   permission.close();
   if (session) return;
   const current = createSession("host");
-  current.manual = useManual;
+  current.manual = useManual || manualMode.checked;
+  manualOption.hidden = true;
   start.hidden = true;
   stop.hidden = false;
   stopText.textContent = "Cancelar solicitação";
@@ -341,8 +367,9 @@ if (watching) {
     watch();
   }
 } else {
+  manualOption.hidden = useManual;
   start.addEventListener("click", () => {
-    const unavailable = checkSupport("host", useManual);
+    const unavailable = checkSupport("host", useManual || manualMode.checked);
     if (unavailable) return feedback(unavailable);
     feedback();
     permission.showModal();
@@ -369,7 +396,7 @@ async function copyField(field, message) {
   }
 }
 
-copy.addEventListener("click", () => copyField(invite, useManual
+copy.addEventListener("click", () => copyField(invite, session?.manual
   ? "Link copiado. Envie o convite e aguarde o código de resposta."
   : "Link copiado. Envie para quem vai assistir."));
 

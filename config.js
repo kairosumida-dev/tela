@@ -1,3 +1,2 @@
-// Configure o endereço wss:// do Worker antes de publicar no GitHub Pages.
-// Em localhost, a página usa automaticamente o Worker de desenvolvimento.
-window.SIGNALING_URL = "";
+// O endereço público conecta os navegadores. O vídeo segue direto por WebRTC.
+window.SIGNALING_URL = "wss://compartilhar-tela-sinalizacao.kairosumida0.workers.dev";

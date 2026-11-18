@@ -119,3 +119,6 @@ dialog form { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8p
 
 .exchange textarea { display: block; width: 100%; min-height: 68px; padding: 10px; resize: vertical; background: #181a1a; color: inherit; border: 1px solid var(--line); border-radius: 6px; font: .8rem var(--mono); }
 .exchange .button { margin-top: 10px; }
+
+.mode-option { display: flex; align-items: center; gap: 8px; width: fit-content; min-height: 36px; margin-top: 6px; color: var(--muted); font-size: .875rem; cursor: pointer; }
+.mode-option input { margin: 0; accent-color: var(--lime); }
