@@ -59,6 +59,7 @@ function finish(current, message = "", status = "Encerrado") {
   invite.value = "";
   invite.disabled = true;
   copy.disabled = true;
+  element("download-invite").hidden = true;
   element("answer-form").reset();
   element("answer-form").hidden = true;
   element("response-code").value = "";
@@ -84,7 +85,7 @@ function isCurrent(current, peer) {
 
 function addPeer(current, id) {
   closePeer(current);
-  const connection = new RTCPeerConnection({ iceServers });
+  const connection = new RTCPeerConnection(current.manual ? { iceServers, bundlePolicy: "max-bundle" } : { iceServers });
   const peer = { id, connection, pendingCandidates: [] };
   current.peer = peer;
   setStatus(current.role === "host" ? "Conectando espectador" : "Conectando à transmissão");

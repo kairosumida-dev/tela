@@ -1,4 +1,35 @@
 const codeLimit = 24_000;
+const messageLimit = 2_000;
+
+function prioritizeCommonVideoCodecs(connection) {
+  const transceiver = connection.getTransceivers().find(({ sender }) => sender.track?.kind === "video");
+  const codecs = globalThis.RTCRtpSender?.getCapabilities?.("video")?.codecs ?? [];
+  const vp8 = codecs.find(({ mimeType }) => mimeType.toLowerCase() === "video/vp8");
+  const h264Codecs = codecs.filter(({ mimeType }) => mimeType.toLowerCase() === "video/h264");
+  const h264 = h264Codecs.find(({ sdpFmtpLine }) =>
+    /(?:^|;)profile-level-id=42(?:e0|00)/i.test(sdpFmtpLine ?? "") &&
+    /(?:^|;)packetization-mode=1(?:;|$)/.test(sdpFmtpLine ?? ""),
+  ) ?? h264Codecs[0];
+  const video = [vp8, h264].filter(Boolean);
+  if (!transceiver?.setCodecPreferences || !video.length) return;
+  const recovery = codecs.filter(({ mimeType }) => mimeType.toLowerCase() === "video/rtx");
+  try {
+    transceiver.setCodecPreferences([...video, ...recovery]);
+  } catch {
+    // Browsers may expose different codec capabilities for sender and receiver.
+  }
+}
+
+function saveExchangeText(filename, value) {
+  const url = URL.createObjectURL(new Blob([value], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
 
 async function sessionCode(description) {
   const raw = new TextEncoder().encode(JSON.stringify(description));
@@ -72,6 +103,7 @@ function attachManualChannel(current, channel) {
 
 async function manualOffer(current) {
   const peer = addPeer(current, "manual");
+  prioritizeCommonVideoCodecs(peer.connection);
   attachManualChannel(current, peer.connection.createDataChannel("session"));
   const code = await prepareSessionCode(peer.connection);
   if (!isCurrent(current, peer)) return;
@@ -80,6 +112,7 @@ async function manualOffer(current) {
   invite.value = url.href;
   invite.disabled = false;
   copy.disabled = false;
+  element("download-invite").hidden = url.href.length <= messageLimit;
   element("answer-form").hidden = false;
   setStatus("Aguardando resposta");
   feedback("Envie o convite e cole aqui o código de resposta que a outra pessoa enviar.");
@@ -111,6 +144,7 @@ async function manualWatch(raw) {
     const code = await prepareSessionCode(peer.connection);
     if (!isCurrent(current, peer)) return;
     element("response-code").value = code;
+    element("download-response").hidden = code.length <= messageLimit;
     element("response-panel").hidden = false;
     setStatus("Resposta pronta");
   } catch {
@@ -146,5 +180,7 @@ function configureManualExchange() {
     }
   });
 
+  element("download-invite").addEventListener("click", () => saveExchangeText("convite-tela.txt", invite.value));
+  element("download-response").addEventListener("click", () => saveExchangeText("resposta-tela.txt", element("response-code").value));
   element("copy-response").addEventListener("click", () => copyField(element("response-code"), "Resposta copiada. Envie o código a quem compartilhou o link."));
 }

@@ -24,6 +24,8 @@ Publique a raiz do repositório no GitHub Pages com HTTPS ativo. Com a opção p
 2. Quem assiste abre o link, copia o código de resposta e o devolve a quem apresenta.
 3. Quem apresenta cola o código na página e seleciona **Conectar espectador**.
 
+O convite e a resposta são compactados para envio em chats. Se algum deles ultrapassar 2.000 caracteres, a página também oferece um arquivo de texto para anexar.
+
 Abra a página local com `#manual` no fim do endereço para testar esse mesmo fluxo.
 
 ## Convite automático com Cloudflare (opcional)
