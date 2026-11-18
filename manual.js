@@ -147,6 +147,7 @@ async function manualWatch(raw) {
     element("download-response").hidden = code.length <= messageLimit;
     element("response-panel").hidden = false;
     setStatus("Resposta pronta");
+    setOccupancy(1, 2);
   } catch {
     finish(current, "Não foi possível preparar a resposta. Peça um novo convite.");
   }
@@ -156,7 +157,7 @@ function configureManualExchange() {
   element("answer-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const current = session;
-    const peer = current?.peer;
+    const peer = current?.peers.get("manual");
     if (!current?.manual || !peer) return;
     const field = element("answer");
     const submit = event.submitter;

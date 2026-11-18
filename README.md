@@ -1,6 +1,6 @@
 # Compartilhar Tela
 
-Compartilhamento de tela de uma pessoa para outra, sem cadastro. O navegador de quem apresenta pede autorização a cada sessão e oferece as fontes disponíveis, como uma janela de aplicativo, aba ou tela inteira. Esta versão transmite vídeo sem áudio.
+Compartilhamento de tela para até cinco pessoas, sem cadastro. Uma pessoa apresenta e até quatro assistem pelo mesmo convite. O navegador de quem apresenta pede autorização a cada sessão e oferece as fontes disponíveis, como uma janela de aplicativo, aba ou tela inteira. A resolução é escolhida antes da captura, com opções de 480p a 4K. A página mostra as dimensões reais do vídeo e pode abrir a prévia em tela cheia. A transmissão usa vídeo sem áudio.
 
 ## Teste local
 
@@ -18,7 +18,7 @@ Abra [a página local](http://127.0.0.1:8176/) em um navegador de computador. Cl
 
 ## GitHub Pages
 
-O [site publicado](https://kairosumida-dev.github.io/tela/) gera um link curto que já conecta quem vai assistir. Se o serviço de conexão estiver indisponível, quem apresenta recebe um novo convite com código de resposta. Também dá para selecionar **Usar código manual** antes de começar.
+O [site publicado](https://kairosumida-dev.github.io/tela/) gera um link curto que já conecta quem vai assistir. Se o serviço de conexão estiver indisponível, quem apresenta recebe um novo convite com código de resposta. Também dá para selecionar **Usar código manual** antes de começar. Esse modo conecta um espectador por vez.
 
 1. Quem apresenta autoriza uma fonte e envia o link de convite.
 2. Quem assiste abre o link, copia o código de resposta e o devolve a quem apresenta.
@@ -37,4 +37,4 @@ Abra a página local com `#manual` no fim do endereço para testar esse mesmo fl
 
 O Worker só encaminha os dados de conexão. O vídeo viaja entre os navegadores por WebRTC. Esta versão usa STUN para encontrar uma conexão direta. Se a rede exigir retransmissão, será preciso integrar um serviço TURN antes de usar o compartilhamento naquela rede.
 
-O convite dá acesso a um espectador por vez enquanto a sala está aberta. Envie o endereço apenas para quem deve assistir. Ao parar o compartilhamento ou fechar a página de quem apresenta, a sala é encerrada.
+O convite automático dá acesso a até quatro espectadores enquanto a sala está aberta. O vídeo sai separadamente para cada espectador, então o consumo de upload de quem apresenta aumenta com o público. Envie o endereço apenas para quem deve assistir. Ao parar o compartilhamento ou fechar a página de quem apresenta, a sala é encerrada.

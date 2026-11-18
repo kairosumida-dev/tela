@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Compartilhe uma janela, uma aba ou a tela ao vivo por link.">
   <title>Compartilhar tela</title>
-  <link rel="stylesheet" href="styles.css?v=3">
-  <script src="config.js?v=3" defer></script>
-  <script src="manual.js?v=3" defer></script>
-  <script src="preview.js?v=3" defer></script>
+  <link rel="stylesheet" href="styles.css?v=4">
+  <script src="config.js?v=4" defer></script>
+  <script src="manual.js?v=4" defer></script>
+  <script src="preview.js?v=4" defer></script>
 </head>
 <body>
   <header class="header">
     <div class="shell header-inner">
       <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Compartilhar<span class="brand-accent">Tela</span></div>
-      <span class="prototype">Sala para duas pessoas</span>
+      <span class="prototype">Sala para até 5 pessoas</span>
     </div>
   </header>
 
@@ -25,10 +25,14 @@
     </div>
 
     <div class="workspace">
-      <section class="viewer" aria-labelledby="preview-title">
+      <section class="viewer" id="viewer" aria-labelledby="preview-title">
         <div class="viewer-bar">
           <h2 id="preview-title">Prévia da transmissão</h2>
-          <span class="status" id="status" role="status"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Em espera</span></span>
+          <div class="viewer-actions">
+            <span class="occupancy" id="occupancy" role="status" hidden></span>
+            <span class="status" id="status" role="status"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Em espera</span></span>
+            <button class="button secondary fullscreen" id="fullscreen" type="button" hidden>Tela cheia</button>
+          </div>
         </div>
         <div class="stage" id="stage">
           <video id="video" autoplay muted playsinline hidden aria-label="Vídeo da tela compartilhada"></video>
@@ -36,12 +40,24 @@
           <h3 id="stage-title">Sua tela aparece aqui</h3>
           <p id="stage-text">A prévia aparece depois que você autorizar.</p>
         </div>
-        <div class="viewer-footer"><span>Fonte selecionada</span><span id="source">Nenhuma</span></div>
+        <div class="viewer-footer">
+          <div class="video-meta"><span id="source">Nenhuma fonte</span><span id="resolution" hidden></span></div>
+        </div>
       </section>
 
       <aside class="controls" aria-labelledby="controls-title">
         <h2 id="controls-title">Controles da sala</h2>
         <p id="instructions">Selecione uma janela, uma aba ou a tela inteira no menu do navegador.</p>
+        <div class="quality-setting" id="quality-setting">
+          <label for="quality">Resolução da transmissão</label>
+          <select id="quality">
+            <option value="480">480p</option>
+            <option value="720">720p HD</option>
+            <option value="1080" selected>1080p Full HD</option>
+            <option value="1440">1440p QHD</option>
+            <option value="2160">4K (2160p)</option>
+          </select>
+        </div>
         <button class="button primary" id="start" type="button"><span class="button-screen" aria-hidden="true"></span>Compartilhar tela</button>
         <label class="mode-option" id="manual-option" hidden><input id="manual-mode" type="checkbox">Usar código manual</label>
         <button class="button stop" id="stop" type="button" hidden><span class="stop-mark" aria-hidden="true"></span><span id="stop-text">Parar compartilhamento</span></button>

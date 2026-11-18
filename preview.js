@@ -3,6 +3,10 @@ const permission = element("permission");
 const start = element("start");
 const stop = element("stop");
 const video = element("video");
+const viewer = element("viewer");
+const fullscreen = element("fullscreen");
+const quality = element("quality");
+const occupancy = element("occupancy");
 const invite = element("invite-preview");
 const copy = element("copy");
 const stopText = element("stop-text");
@@ -32,17 +36,64 @@ function setStatus(text, live = false) {
   element("status").classList.toggle("live", live);
 }
 
+function setOccupancy(count, capacity) {
+  occupancy.hidden = !count;
+  occupancy.textContent = count ? `${count}/${capacity} na sala` : "";
+}
+
+function showResolution() {
+  const label = element("resolution");
+  const visible = !!video.srcObject && video.videoWidth > 0;
+  label.hidden = !visible;
+  label.textContent = visible ? `${video.videoWidth} × ${video.videoHeight}` : "";
+}
+
+function isExpanded() {
+  return document.fullscreenElement === viewer || document.body.classList.contains("video-expanded");
+}
+
+function renderFullscreenButton() {
+  fullscreen.textContent = isExpanded() ? "Sair da tela cheia" : "Tela cheia";
+}
+
+async function exitVideoFullscreen() {
+  if (document.fullscreenElement === viewer) {
+    await document.exitFullscreen();
+  } else {
+    document.body.classList.remove("video-expanded");
+    renderFullscreenButton();
+  }
+}
+
 function showVideo(stream) {
   video.srcObject = stream;
   video.hidden = !stream;
   element("stage").classList.toggle("has-video", !!stream);
+  fullscreen.hidden = !stream;
+  if (!stream) {
+    if (isExpanded()) exitVideoFullscreen().catch(() => {});
+    showResolution();
+  }
 }
 
-function closePeer(current) {
-  clearTimeout(current.peerTimeout);
-  const peer = current.peer;
-  current.peer = null;
-  peer?.connection.close();
+function closePeer(current, id) {
+  const peer = current.peers.get(id);
+  if (!peer) return;
+  current.peers.delete(id);
+  clearTimeout(peer.timeout);
+  peer.connection.close();
+}
+
+function closePeers(current) {
+  for (const id of current.peers.keys()) closePeer(current, id);
+}
+
+function updateHostStatus(current) {
+  const live = Array.from(current.peers.values()).some(
+    ({ connection }) => connection.connectionState === "connected",
+  );
+  const idle = current.manual ? "Aguardando resposta" : "Aguardando espectador";
+  setStatus(live ? "Ao vivo" : current.peers.size ? "Conectando espectador" : idle, live);
 }
 
 function finish(current, message = "", status = "Encerrado") {
@@ -50,13 +101,15 @@ function finish(current, message = "", status = "Encerrado") {
   session = null;
   clearTimeout(current.signalingTimeout);
   if (current.channel?.readyState === "open" && current.role === "host") current.channel.send("end");
-  closePeer(current);
+  closePeers(current);
   current.socket?.close();
   current.stream?.getTracks().forEach((track) => track.stop());
 
   showVideo(null);
   start.hidden = false;
   start.disabled = false;
+  quality.disabled = false;
+  setOccupancy(0);
   manualOption.hidden = watching || useManual;
   stop.hidden = true;
   invite.value = "";
@@ -67,7 +120,7 @@ function finish(current, message = "", status = "Encerrado") {
   element("answer-form").hidden = true;
   element("response-code").value = "";
   element("response-panel").hidden = true;
-  element("source").textContent = "Nenhuma";
+  element("source").textContent = "Nenhuma fonte";
   if (current.role === "viewer") {
     element("stage-title").textContent = "Transmissão indisponível";
     element("stage-text").textContent = "Tente reconectar ou peça um novo convite.";
@@ -83,15 +136,16 @@ function send(current, message) {
 }
 
 function isCurrent(current, peer) {
-  return session === current && current.peer === peer;
+  return session === current && current.peers.get(peer.id) === peer;
 }
 
 function addPeer(current, id) {
-  closePeer(current);
+  closePeer(current, id);
   const connection = new RTCPeerConnection(current.manual ? { iceServers, bundlePolicy: "max-bundle" } : { iceServers });
   const peer = { id, connection, pendingCandidates: [] };
-  current.peer = peer;
-  setStatus(current.role === "host" ? "Conectando espectador" : "Conectando à transmissão");
+  current.peers.set(id, peer);
+  if (current.role === "host") updateHostStatus(current);
+  else setStatus("Conectando à transmissão");
 
   connection.addEventListener("icecandidate", ({ candidate }) => {
     if (candidate && isCurrent(current, peer)) {
@@ -100,7 +154,9 @@ function addPeer(current, id) {
   });
 
   if (current.role === "host") {
-    for (const track of current.stream.getTracks()) connection.addTrack(track, current.stream);
+    for (const track of current.stream.getVideoTracks()) {
+      connection.addTransceiver(track, { direction: "sendonly", streams: [current.stream] });
+    }
   } else {
     connection.addEventListener("track", ({ track, streams }) => {
       if (track.kind === "video" && isCurrent(current, peer)) {
@@ -113,12 +169,17 @@ function addPeer(current, id) {
   connection.addEventListener("connectionstatechange", () => {
     if (!isCurrent(current, peer)) return;
     if (connection.connectionState === "connected") {
-      clearTimeout(current.peerTimeout);
-      setStatus("Ao vivo", true);
-      if (current.role === "viewer") element("response-panel").hidden = true;
+      clearTimeout(peer.timeout);
+      if (current.role === "host") updateHostStatus(current);
+      else {
+        setStatus("Ao vivo", true);
+        element("response-panel").hidden = true;
+      }
+      if (current.manual) setOccupancy(2, 2);
       feedback();
     } else if (connection.connectionState === "disconnected") {
-      setStatus("Reconectando");
+      if (current.role === "host" && !current.manual) updateHostStatus(current);
+      else setStatus("Reconectando");
       waitForPeer(current, peer);
     } else if (connection.connectionState === "failed") {
       failPeer(current, peer);
@@ -130,8 +191,8 @@ function addPeer(current, id) {
 }
 
 function waitForPeer(current, peer) {
-  clearTimeout(current.peerTimeout);
-  current.peerTimeout = setTimeout(() => failPeer(current, peer), 20_000);
+  clearTimeout(peer.timeout);
+  peer.timeout = setTimeout(() => failPeer(current, peer), 20_000);
 }
 
 function failPeer(current, peer) {
@@ -140,8 +201,9 @@ function failPeer(current, peer) {
   if (current.role === "viewer" || current.manual) {
     finish(current, message, "Falha de conexão");
   } else {
-    closePeer(current);
-    setStatus("Aguardando espectador");
+    closePeer(current, peer.id);
+    send(current, { type: "drop-peer", id: peer.id });
+    updateHostStatus(current);
     feedback(message);
   }
 }
@@ -157,14 +219,15 @@ async function receive(current, message) {
       invite.disabled = false;
       copy.disabled = false;
       setStatus("Aguardando espectador");
-      feedback("Envie o convite. A transmissão começa quando a outra pessoa entrar.");
+      feedback("Envie o mesmo convite para até quatro espectadores.");
     }
     return;
   }
 
   const roomErrors = {
     "room-closed": "A transmissão foi encerrada ou o convite expirou.",
-    "room-full": "Já tem alguém assistindo. Tente de novo quando essa pessoa sair.",
+    "room-full": "A sala está cheia. Tente novamente quando alguém sair.",
+    "peer-failed": "A conexão com quem compartilha foi interrompida. Tente entrar na sala novamente.",
     "room-busy": "Não foi possível abrir a sala. Inicie uma nova transmissão.",
   };
   if (Object.hasOwn(roomErrors, message.type)) {
@@ -172,10 +235,14 @@ async function receive(current, message) {
     return;
   }
 
-  if (message.type === "peer-left" && current.peer?.id === message.id) {
-    closePeer(current);
-    setStatus("Aguardando espectador");
-    feedback("O espectador saiu. Seu convite permanece disponível.");
+  if (message.type === "occupancy") {
+    setOccupancy(message.count, message.capacity);
+    return;
+  }
+
+  if (message.type === "peer-left") {
+    closePeer(current, message.id);
+    updateHostStatus(current);
     return;
   }
 
@@ -194,8 +261,8 @@ async function receive(current, message) {
     return;
   }
 
-  const peer = current.peer;
-  if (!peer || peer.id !== message.id) return;
+  const peer = current.peers.get(message.id);
+  if (!peer) return;
   const connection = peer.connection;
 
   try {
@@ -223,6 +290,7 @@ function connect(current) {
   const endpoint = new URL(signalingUrl);
   endpoint.pathname = `${endpoint.pathname.replace(/\/$/, "")}/room/${current.room}`;
   endpoint.searchParams.set("role", current.role);
+  if (current.role === "host") endpoint.searchParams.set("v", "2");
   const protocols = current.secret ? ["screen-share", current.secret] : ["screen-share"];
   const socket = new WebSocket(endpoint, protocols);
   current.socket = socket;
@@ -234,6 +302,8 @@ function connect(current) {
     }
 
     current.manual = true;
+    closePeers(current);
+    setOccupancy(1, 2);
     clearTimeout(current.signalingTimeout);
     current.socket = null;
     socket.close();
@@ -272,7 +342,7 @@ function checkSupport(role, manual = false) {
 }
 
 function createSession(role, room) {
-  const current = { role, room, queue: Promise.resolve() };
+  const current = { role, room, peers: new Map(), queue: Promise.resolve() };
   session = current;
   feedback();
   start.disabled = true;
@@ -293,8 +363,18 @@ async function capture() {
   stop.hidden = false;
   stopText.textContent = "Cancelar solicitação";
   setStatus("Aguardando autorização");
+  quality.disabled = true;
+  const height = Number(quality.value);
+  const width = Math.round(height * 8 / 9) * 2;
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 24 } }, audio: false });
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        width: { ideal: width, max: width },
+        height: { ideal: height, max: height },
+        frameRate: { ideal: 30, max: 30 },
+      },
+      audio: false,
+    });
     const track = stream.getVideoTracks()[0];
     if (session !== current || track?.readyState !== "live") {
       stream.getTracks().forEach((item) => item.stop());
@@ -302,6 +382,7 @@ async function capture() {
       return;
     }
     current.stream = stream;
+    if ("contentHint" in track) track.contentHint = "detail";
     track.addEventListener("ended", () => finish(current, "Compartilhamento encerrado no navegador."), { once: true });
     showVideo(stream);
     element("source").textContent = sourceNames[track.getSettings().displaySurface] ?? "Fonte selecionada";
@@ -310,6 +391,7 @@ async function capture() {
     setStatus("Abrindo sala");
 
     if (current.manual) {
+      setOccupancy(1, 2);
       await manualOffer(current);
       return;
     }
@@ -348,6 +430,8 @@ function watch() {
 }
 
 if (watching) {
+  document.body.classList.add("watching");
+  element("quality-setting").hidden = true;
   document.title = "Assistir à transmissão";
   element("page-title").textContent = "Assistir à transmissão";
   element("preview-title").textContent = "Tela compartilhada";
@@ -402,6 +486,28 @@ copy.addEventListener("click", () => copyField(invite, session?.manual
 
 window.addEventListener("pagehide", () => {
   if (session) finish(session);
+});
+
+video.addEventListener("loadedmetadata", showResolution);
+video.addEventListener("resize", showResolution);
+document.addEventListener("fullscreenchange", renderFullscreenButton);
+fullscreen.addEventListener("click", async () => {
+  if (isExpanded()) {
+    await exitVideoFullscreen().catch(() => {});
+    return;
+  }
+  try {
+    await viewer.requestFullscreen();
+  } catch {
+    if (!video.srcObject) return;
+    document.body.classList.add("video-expanded");
+    renderFullscreenButton();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("video-expanded")) {
+    exitVideoFullscreen();
+  }
 });
 
 configureManualExchange();

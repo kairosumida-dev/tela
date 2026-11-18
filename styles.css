@@ -122,3 +122,56 @@ dialog form { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8p
 
 .mode-option { display: flex; align-items: center; gap: 8px; width: fit-content; min-height: 36px; margin-top: 6px; color: var(--muted); font-size: .875rem; cursor: pointer; }
 .mode-option input { margin: 0; accent-color: var(--lime); }
+
+.viewer-actions, .video-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.viewer-actions { justify-content: flex-end; }
+.occupancy { color: var(--muted); font: .75rem var(--mono); }
+.viewer-footer { flex-wrap: wrap; }
+.video-meta #resolution { color: var(--muted); }
+.fullscreen { min-height: 36px; padding: 6px 10px; font-size: .875rem; white-space: nowrap; }
+.quality-setting { display: grid; gap: 8px; margin-top: 20px; }
+.quality-setting label { font-size: .875rem; font-weight: 600; }
+.quality-setting select {
+  width: 100%;
+  min-height: 44px;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 32px 8px 10px;
+  color: inherit;
+  font: inherit;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%) right 16px center / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%) right 11px center / 5px 5px no-repeat,
+    #181a1a;
+}
+.quality-setting select:disabled { opacity: .7; }
+.watching .workspace { grid-template-columns: minmax(0, 1fr); }
+.watching .intro { margin-bottom: 20px; }
+.watching main { padding-top: clamp(20px, 3vw, 44px); }
+.watching h1 { font-size: clamp(2rem, 4vw, 3.75rem); }
+.watching .stage { max-height: 76svh; }
+.watching .controls { width: min(100%, 460px); }
+:is(.viewer:fullscreen, .video-expanded .viewer) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #101112;
+}
+:is(.viewer:fullscreen, .video-expanded .viewer) .stage {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+}
+:is(.viewer:fullscreen, .video-expanded .viewer) .viewer-footer { display: none; }
+.video-expanded { overflow: hidden; }
+.video-expanded .header, .video-expanded .intro, .video-expanded .controls { display: none; }
+.video-expanded .viewer { position: fixed; inset: 0; z-index: 5; }
+@media (max-width: 480px) {
+  .viewer-bar, .viewer-footer { padding-inline: 12px; }
+  .viewer-bar { flex-wrap: wrap; }
+}

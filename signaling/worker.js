@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 const roomPattern = /^[a-f0-9]{64}$/;
+const viewerLimit = 4;
 
 async function roomFor(secret) {
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
@@ -53,8 +54,8 @@ function send(socket, message) {
 export class Room extends DurableObject {
   #limits = new WeakMap();
 
-  #socket(role) {
-    return this.ctx.getWebSockets(role).find(
+  #sockets(role) {
+    return this.ctx.getWebSockets(role).filter(
       (socket) => {
         const member = socket.deserializeAttachment();
         return socket.readyState === WebSocket.OPEN && member?.role === role && !member.finished;
@@ -63,27 +64,33 @@ export class Room extends DurableObject {
   }
 
   fetch(request) {
-    const role = new URL(request.url).searchParams.get("role");
+    const params = new URL(request.url).searchParams;
+    const role = params.get("role");
     const [client, socket] = Object.values(new WebSocketPair());
-    const host = this.#socket("host");
-    const viewer = this.#socket("viewer");
+    const [host] = this.#sockets("host");
+    const viewers = this.#sockets("viewer");
+    // A host loaded before this release can negotiate with one viewer.
+    const capacity = host?.deserializeAttachment()?.viewerLimit ?? 1;
     this.ctx.acceptWebSocket(socket, [role]);
 
     const rejection = role === "host" && host ? "room-busy"
       : role === "viewer" && !host ? "room-closed"
-      : role === "viewer" && viewer ? "room-full"
+      : role === "viewer" && viewers.length >= capacity ? "room-full"
       : null;
     if (rejection) {
       send(socket, { type: rejection });
       socket.close(1000, "Sala indisponível");
     } else {
       const id = crypto.randomUUID();
-      socket.serializeAttachment({ role, id });
+      socket.serializeAttachment(role === "host"
+        ? { role, id, viewerLimit: params.get("v") === "2" ? viewerLimit : 1 }
+        : { role, id });
       send(socket, { type: "ready" });
       if (role === "viewer") {
         send(socket, { type: "peer", id });
         send(host, { type: "peer", id });
       }
+      this.#sendOccupancy();
     }
     return new Response(null, {
       status: 101,
@@ -117,9 +124,17 @@ export class Room extends DurableObject {
     if (!message || typeof message !== "object") return;
 
     const isHost = member.role === "host";
-    const peer = this.#socket(isHost ? "viewer" : "host");
-    const id = isHost ? peer?.deserializeAttachment()?.id : member.id;
+    const peer = isHost
+      ? this.#sockets("viewer").find((viewer) => viewer.deserializeAttachment().id === message.id)
+      : this.#sockets("host")[0];
+    const id = isHost ? peer?.deserializeAttachment().id : member.id;
     if (!peer || message.id !== id) return;
+
+    if (isHost && message.type === "drop-peer") {
+      this.#closeViewer(peer, "peer-failed", "Conexão de vídeo interrompida");
+      this.#sendOccupancy();
+      return;
+    }
 
     if (message.type === "candidate" && typeof message.candidate?.candidate === "string") {
       send(peer, { type: "candidate", id, candidate: message.candidate });
@@ -129,20 +144,33 @@ export class Room extends DurableObject {
     }
   }
 
+  #sendOccupancy() {
+    const [host] = this.#sockets("host");
+    if (!host) return;
+    const viewers = this.#sockets("viewer");
+    const occupancy = { type: "occupancy", count: 1 + viewers.length, capacity: 1 + (host.deserializeAttachment().viewerLimit ?? 1) };
+    send(host, occupancy);
+    for (const viewer of viewers) send(viewer, occupancy);
+  }
+
+  #closeViewer(viewer, type, reason) {
+    viewer.serializeAttachment({ ...viewer.deserializeAttachment(), finished: true });
+    send(viewer, { type });
+    viewer.close(1000, reason);
+  }
+
   #leave(socket) {
     const member = socket.deserializeAttachment();
     if (!member || member.finished) return;
     socket.serializeAttachment({ ...member, finished: true });
 
     if (member.role === "host") {
-      const viewer = this.#socket("viewer");
-      if (viewer) {
-        send(viewer, { type: "room-closed" });
-        viewer.serializeAttachment({ ...viewer.deserializeAttachment(), finished: true });
-        viewer.close(1000, "Transmissão encerrada");
+      for (const viewer of this.#sockets("viewer")) {
+        this.#closeViewer(viewer, "room-closed", "Transmissão encerrada");
       }
     } else {
-      send(this.#socket("host"), { type: "peer-left", id: member.id });
+      send(this.#sockets("host")[0], { type: "peer-left", id: member.id });
+      this.#sendOccupancy();
     }
   }
 
