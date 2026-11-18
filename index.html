@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Compartilhe uma janela, uma aba ou a tela ao vivo por link.">
+  <title>Compartilhar tela</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js" defer></script>
+  <script src="manual.js" defer></script>
+  <script src="preview.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div class="shell header-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Compartilhar<span class="brand-accent">Tela</span></div>
+      <span class="prototype">Sala para duas pessoas</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <div class="intro">
+      <h1 id="page-title">Compartilhar tela</h1>
+      <p id="intro">Escolha o que mostrar e convide alguém para assistir.</p>
+    </div>
+
+    <div class="workspace">
+      <section class="viewer" aria-labelledby="preview-title">
+        <div class="viewer-bar">
+          <h2 id="preview-title">Prévia da transmissão</h2>
+          <span class="status" id="status" role="status"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Em espera</span></span>
+        </div>
+        <div class="stage" id="stage">
+          <video id="video" autoplay muted playsinline hidden aria-label="Vídeo da tela compartilhada"></video>
+          <div class="reticle" aria-hidden="true"><span class="monitor"></span></div>
+          <h3 id="stage-title">Sua tela aparece aqui</h3>
+          <p id="stage-text">A prévia aparece depois que você autorizar.</p>
+        </div>
+        <div class="viewer-footer"><span>Fonte selecionada</span><span id="source">Nenhuma</span></div>
+      </section>
+
+      <aside class="controls" aria-labelledby="controls-title">
+        <h2 id="controls-title">Controles da sala</h2>
+        <p id="instructions">Selecione uma janela, uma aba ou a tela inteira no menu do navegador.</p>
+        <button class="button primary" id="start" type="button"><span class="button-screen" aria-hidden="true"></span>Compartilhar tela</button>
+        <button class="button stop" id="stop" type="button" hidden><span class="stop-mark" aria-hidden="true"></span><span id="stop-text">Parar compartilhamento</span></button>
+
+        <div class="invite" id="invite">
+          <label for="invite-preview">Link de convite</label>
+          <div class="link-field">
+            <input id="invite-preview" type="text" placeholder="Disponível ao iniciar uma sala" readonly disabled>
+            <button type="button" class="copy" id="copy" disabled>Copiar</button>
+          </div>
+        </div>
+        <form id="answer-form" class="invite exchange" hidden>
+          <label for="answer">Código de resposta</label>
+          <textarea id="answer" rows="3" maxlength="24000" required placeholder="Cole o código de quem vai assistir"></textarea>
+          <button type="submit" class="button secondary">Conectar espectador</button>
+        </form>
+        <div id="response-panel" class="invite exchange" hidden>
+          <label for="response-code">Seu código de resposta</label>
+          <textarea id="response-code" rows="3" readonly></textarea>
+          <button type="button" class="button secondary" id="copy-response">Copiar resposta</button>
+        </div>
+        <p id="feedback" class="feedback" role="status" hidden></p>
+        <div class="privacy" id="privacy">
+          <span class="lock" aria-hidden="true"></span>
+          <p>O navegador pede sua permissão toda vez que você compartilha a tela.</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <dialog id="permission" aria-labelledby="permission-title" aria-describedby="permission-description">
+    <div class="dialog-content">
+      <span class="dialog-icon" aria-hidden="true"><span class="button-screen"></span></span>
+      <h2 id="permission-title">Autorizar compartilhamento</h2>
+      <p id="permission-description">Na próxima etapa, escolha o que mostrar e confirme no navegador. Para mostrar só um aplicativo, escolha a janela dele.</p>
+      <form method="dialog">
+        <button class="button secondary" value="cancel" autofocus>Cancelar</button>
+        <button class="button primary" type="button" id="confirm">Escolher o que mostrar</button>
+      </form>
+    </div>
+  </dialog>
+</body>
+</html>
