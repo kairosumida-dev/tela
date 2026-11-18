@@ -21,6 +21,7 @@ const route = new URLSearchParams(location.hash.slice(1));
 const viewerRoom = route.get("assistir");
 const manualInvite = route.get("oferta");
 const watching = viewerRoom !== null || manualInvite !== null;
+const canCapture = !!navigator.mediaDevices?.getDisplayMedia;
 const iceServers = [{ urls: "stun:stun.cloudflare.com:3478" }];
 const localSite = location.hostname === "127.0.0.1" || location.hostname === "localhost";
 const signalingUrl = localSite ? "ws://127.0.0.1:18787" : window.SIGNALING_URL;
@@ -412,7 +413,7 @@ function connect(current) {
 function checkSupport(role, manual = false) {
   if (!window.isSecureContext) return "Abra a página por HTTPS para iniciar ou assistir a uma transmissão.";
   if (!window.RTCPeerConnection || !window.WebSocket) return "Este navegador não oferece suporte à transmissão ao vivo.";
-  if (role === "host" && !navigator.mediaDevices?.getDisplayMedia) {
+  if (role === "host" && !canCapture) {
     return "Para compartilhar, abra a página em um navegador de computador com captura de tela.";
   }
   if (manual) return "";
@@ -533,6 +534,14 @@ if (watching) {
     start.addEventListener("click", watch);
     watch();
   }
+} else if (!canCapture) {
+  element("intro").textContent = "Abra um link de convite para assistir a uma transmissão.";
+  element("instructions").textContent = "Para transmitir a tela, use um navegador de computador com suporte à captura.";
+  element("quality-setting").hidden = true;
+  element("invite").hidden = true;
+  element("privacy").hidden = true;
+  start.hidden = true;
+  setImageMessage("Nenhuma transmissão aberta", "Abra o link enviado por quem está compartilhando.");
 } else {
   manualOption.hidden = useManual;
   start.addEventListener("click", () => {
