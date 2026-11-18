@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Compartilhe uma janela, uma aba ou a tela ao vivo por link.">
   <title>Compartilhar tela</title>
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
   <script src="config.js?v=4" defer></script>
   <script src="manual.js?v=4" defer></script>
-  <script src="preview.js?v=4" defer></script>
+  <script src="preview.js?v=5" defer></script>
 </head>
 <body>
   <header class="header">
@@ -36,9 +36,12 @@
         </div>
         <div class="stage" id="stage">
           <video id="video" autoplay muted playsinline hidden aria-label="Vídeo da tela compartilhada"></video>
-          <div class="reticle" aria-hidden="true"><span class="monitor"></span></div>
-          <h3 id="stage-title">Sua tela aparece aqui</h3>
-          <p id="stage-text">A prévia aparece depois que você autorizar.</p>
+          <div class="stage-placeholder">
+            <div class="reticle" aria-hidden="true"><span class="monitor"></span></div>
+            <h3 id="stage-title">Sua tela aparece aqui</h3>
+            <p id="stage-text">A prévia aparece depois que você autorizar.</p>
+            <button id="play-video" class="button primary" type="button" hidden>Reproduzir vídeo</button>
+          </div>
         </div>
         <div class="viewer-footer">
           <div class="video-meta"><span id="source">Nenhuma fonte</span><span id="resolution" hidden></span></div>

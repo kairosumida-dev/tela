@@ -110,7 +110,9 @@ dialog form { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8p
 }
 
 .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #101112; }
-.stage.has-video::before, .stage.has-video::after, .stage.has-video .reticle, .stage.has-video h3, .stage.has-video p { display: none; }
+.stage-placeholder { position: relative; z-index: 1; display: grid; justify-items: center; }
+.stage-placeholder .button { margin-top: 16px; }
+.stage.has-video::before, .stage.has-video::after, .stage.has-video .stage-placeholder { display: none; }
 .copy:enabled { color: var(--lime); }
 .copy:enabled:hover { background: #303624; }
 .copy:focus-visible, .link-field input:focus-visible { outline-offset: -3px; }

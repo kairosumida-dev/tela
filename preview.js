@@ -3,6 +3,10 @@ const permission = element("permission");
 const start = element("start");
 const stop = element("stop");
 const video = element("video");
+const playVideo = element("play-video");
+const stage = element("stage");
+const stageTitle = element("stage-title");
+const stageText = element("stage-text");
 const viewer = element("viewer");
 const fullscreen = element("fullscreen");
 const quality = element("quality");
@@ -24,6 +28,7 @@ const useManual = !signalingUrl || route.has("manual");
 const sourceNames = { browser: "Aba do navegador", window: "Janela do aplicativo", monitor: "Tela inteira" };
 
 let session = null;
+let imageTimeout;
 
 function feedback(message = "") {
   const label = element("feedback");
@@ -65,14 +70,86 @@ async function exitVideoFullscreen() {
   }
 }
 
+function setImageMessage(title, message, allowPlayback = false) {
+  stageTitle.textContent = title;
+  stageText.textContent = message;
+  playVideo.hidden = !allowPlayback;
+}
+
+function hasImage() {
+  return !!video.srcObject && !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0;
+}
+
+function updateVideoPresentation() {
+  const ready = hasImage();
+  stage.classList.toggle("has-video", ready);
+  fullscreen.hidden = !ready && !isExpanded();
+  showResolution();
+  if (ready) {
+    clearTimeout(imageTimeout);
+    playVideo.hidden = true;
+  }
+  return ready;
+}
+
+function waitForImage() {
+  clearTimeout(imageTimeout);
+  const current = session;
+  imageTimeout = setTimeout(() => {
+    if (session !== current || hasImage()) return;
+    setImageMessage(
+      "Sem imagem por enquanto",
+      watching
+        ? "Tente reproduzir de novo. Se continuar sem imagem, saia e reabra o convite."
+        : "Tente reproduzir a prévia ou escolha outra janela.",
+      !!video.srcObject,
+    );
+  }, 8_000);
+}
+
+function playStream(retry = false) {
+  const stream = video.srcObject;
+  if (!stream) return;
+  setImageMessage("Aguardando imagem", "O vídeo aparece assim que o navegador receber a imagem.");
+  waitForImage();
+  if (retry && !video.paused && !hasImage()) {
+    video.pause();
+    video.srcObject = null;
+    video.srcObject = stream;
+  }
+  video.play().then(updateViewerPlayback).catch((error) => {
+    if (video.srcObject !== stream) return;
+    clearTimeout(imageTimeout);
+    setImageMessage(
+      error.name === "NotAllowedError" ? "Reprodução pausada" : "Não foi possível reproduzir o vídeo",
+      "Clique para iniciar o vídeo neste navegador.",
+      true,
+    );
+    updateVideoPresentation();
+  });
+}
+
 function showVideo(stream) {
-  video.srcObject = stream;
+  clearTimeout(imageTimeout);
   video.hidden = !stream;
-  element("stage").classList.toggle("has-video", !!stream);
-  fullscreen.hidden = !stream;
-  if (!stream) {
+  video.muted = true;
+  video.srcObject = stream;
+  updateVideoPresentation();
+  if (stream) {
+    playStream();
+  } else {
+    playVideo.hidden = true;
+    fullscreen.hidden = true;
     if (isExpanded()) exitVideoFullscreen().catch(() => {});
-    showResolution();
+  }
+}
+
+function updateViewerPlayback() {
+  const ready = updateVideoPresentation();
+  if (ready && session?.role === "viewer" && Array.from(session.peers.values()).some(
+    ({ connection }) => connection.connectionState === "connected",
+  )) {
+    setStatus("Ao vivo", true);
   }
 }
 
@@ -122,8 +199,9 @@ function finish(current, message = "", status = "Encerrado") {
   element("response-panel").hidden = true;
   element("source").textContent = "Nenhuma fonte";
   if (current.role === "viewer") {
-    element("stage-title").textContent = "Transmissão indisponível";
-    element("stage-text").textContent = "Tente reconectar ou peça um novo convite.";
+    setImageMessage("Transmissão indisponível", "Tente reconectar ou peça um novo convite.");
+  } else {
+    setImageMessage("Sua tela aparece aqui", "A prévia aparece depois que você autorizar.");
   }
   setStatus(status);
   feedback(message);
@@ -172,7 +250,12 @@ function addPeer(current, id) {
       clearTimeout(peer.timeout);
       if (current.role === "host") updateHostStatus(current);
       else {
-        setStatus("Ao vivo", true);
+        if (hasImage()) {
+          setStatus("Ao vivo", true);
+        } else {
+          setStatus("Aguardando imagem");
+          if (!video.srcObject) waitForImage();
+        }
         element("response-panel").hidden = true;
       }
       if (current.manual) setOccupancy(2, 2);
@@ -488,9 +571,21 @@ window.addEventListener("pagehide", () => {
   if (session) finish(session);
 });
 
-video.addEventListener("loadedmetadata", showResolution);
-video.addEventListener("resize", showResolution);
-document.addEventListener("fullscreenchange", renderFullscreenButton);
+for (const event of ["loadeddata", "playing", "resize"]) {
+  video.addEventListener(event, updateViewerPlayback);
+}
+video.addEventListener("pause", () => {
+  if (!video.srcObject || !video.paused) return;
+  if (watching) setStatus("Reprodução pausada");
+  clearTimeout(imageTimeout);
+  setImageMessage("Reprodução pausada", "Clique para retomar o vídeo.", true);
+  updateVideoPresentation();
+});
+playVideo.addEventListener("click", () => playStream(true));
+document.addEventListener("fullscreenchange", () => {
+  renderFullscreenButton();
+  updateVideoPresentation();
+});
 fullscreen.addEventListener("click", async () => {
   if (isExpanded()) {
     await exitVideoFullscreen().catch(() => {});
